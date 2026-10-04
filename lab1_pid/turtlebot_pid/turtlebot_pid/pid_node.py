@@ -25,6 +25,7 @@ class PIDController(Node):
         # Error States
         self.ep_prev = 0.0; self.ei_p = 0.0
         self.ea_prev = 0.0; self.ei_a = 0.0
+        self.first_loop = True
         
         self.current_x = 0.0; self.current_y = 0.0; self.current_theta = 0.0
         self.state_received = False
@@ -71,6 +72,9 @@ class PIDController(Node):
 
         # 4. Compute PID control inputs
         # Hint: Remember to saturate linear velocity (e.g., max 0.2 m/s)
+        if self.first_loop:                       # no previous error yet: avoid derivative kick
+            self.ep_prev = ep_c; self.ea_prev = ea_c
+            self.first_loop = False
         dep = (ep_c - self.ep_prev) / dt                                   # d(ep)/dt
         dea = math.atan2(math.sin(ea_c - self.ea_prev),
                          math.cos(ea_c - self.ea_prev)) / dt               # d(ea)/dt, wrapped
