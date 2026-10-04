@@ -2,7 +2,7 @@
 
 `turtlebot_pid` is a ROS 2 Humble package that drives a TurtleBot3 Burger in Gazebo
 to the goal (5.02, 1.78) using PID control on distance and heading error.
-It reads `/odom`, publishes `/cmd_vel` at 10 Hz and stops within 5 cm of the goal.
+It reads `/odom`, publishes `/cmd_vel` at 10 Hz and stops within 2 cm of the goal.
 
 Gains used in `pid_node.py`:
 
@@ -34,6 +34,14 @@ ros2 run turtlebot_pid pid_node
 ```
 
 After `GOAL REACHED!`, press Ctrl+C in terminal 2. The plot is saved to `~/trajectory.png`.
+Pressing Ctrl+C in terminal 3 at any time stops the robot.
+
+To use another goal, pass it to both scripts:
+
+```bash
+python3 ~/ros2_ws/src/cp241_alnc_iisc/lab1_pid/turtlebot_pid/turtlebot_pid/plot_trajectory.py --ros-args -p xd:=-2.0 -p yd:=1.0
+ros2 run turtlebot_pid pid_node --ros-args -p xd:=-2.0 -p yd:=1.0
+```
 
 To test from a different start pose, restart Gazebo and move the robot first:
 

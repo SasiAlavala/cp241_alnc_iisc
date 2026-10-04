@@ -1,5 +1,7 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.signals import SignalHandlerOptions
+from rcl_interfaces.msg import ParameterDescriptor
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 import math
@@ -9,9 +11,12 @@ class PIDController(Node):
     def __init__(self):
         super().__init__('pid_controller')
         
-        # Target Pose
-        self.xd = 5.02
-        self.yd = 1.78
+        # Target Pose (change with: ros2 run turtlebot_pid pid_node --ros-args -p xd:=2.0 -p yd:=-1.0)
+        any_number = ParameterDescriptor(dynamic_typing=True)  # accept 2 as well as 2.0
+        self.xd = float(self.declare_parameter('xd', 5.02, any_number).value)
+        self.yd = float(self.declare_parameter('yd', 1.78, any_number).value)
+        if not (math.isfinite(self.xd) and math.isfinite(self.yd)):
+            raise ValueError("goal must be finite numbers")
         
         # Gains (Tune these)
         self.kp_p = 0.30; self.kd_p = 0.05; self.ki_p = 0.01
@@ -29,7 +34,7 @@ class PIDController(Node):
         
         self.timer = self.create_timer(0.1, self.control_loop) # 10Hz
         self.last_time = time.time()
-        self.get_logger().info("Controller Started!")
+        self.get_logger().info("Controller Started! Goal: (%.2f, %.2f)" % (self.xd, self.yd))
 
     def odom_callback(self, msg):
         self.current_x = msg.pose.pose.position.x
@@ -58,7 +63,7 @@ class PIDController(Node):
         ea_c = math.atan2(math.sin(ea_c), math.cos(ea_c))
         
         # 3. Check stop condition (e.g., if ep_c is less than a tolerance)
-        if ep_c < 0.05:  # stop within 5 cm of the goal
+        if ep_c < 0.02:  # stop within 2 cm of the goal
             self.get_logger().info("GOAL REACHED!")
             self.publisher_.publish(Twist()) # Stop robot
             self.timer.cancel()
@@ -94,9 +99,20 @@ class PIDController(Node):
         self.publisher_.publish(cmd_msg)
 
 def main(args=None):
-    rclpy.init(args=args)
-    node = PIDController()
-    rclpy.spin(node)
+    # Handle Ctrl+C ourselves so a stop command can still be sent before ROS shuts down
+    rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
+    try:
+        node = PIDController()
+    except ValueError as e:
+        print("Invalid goal:", e)
+        rclpy.shutdown()
+        return
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    node.publisher_.publish(Twist())  # stop the robot, otherwise it keeps the last command
+    node.get_logger().info("Stopped")
     node.destroy_node()
     rclpy.shutdown()
 
