@@ -11,8 +11,8 @@ class PIDController(Node):
     def __init__(self):
         super().__init__('pid_controller')
         
-        # Target Pose (change with: ros2 run turtlebot_pid pid_node --ros-args -p xd:=2.0 -p yd:=-1.0)
-        any_number = ParameterDescriptor(dynamic_typing=True)  # accept 2 as well as 2.0
+        # Target Pose
+        any_number = ParameterDescriptor(dynamic_typing=True)
         self.xd = float(self.declare_parameter('xd', 5.02, any_number).value)
         self.yd = float(self.declare_parameter('yd', 1.78, any_number).value)
         if not (math.isfinite(self.xd) and math.isfinite(self.yd)):
@@ -103,7 +103,6 @@ class PIDController(Node):
         self.publisher_.publish(cmd_msg)
 
 def main(args=None):
-    # Handle Ctrl+C ourselves so a stop command can still be sent before ROS shuts down
     rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
     try:
         node = PIDController()
@@ -115,7 +114,7 @@ def main(args=None):
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
-    node.publisher_.publish(Twist())  # stop the robot, otherwise it keeps the last command
+    node.publisher_.publish(Twist()) 
     node.get_logger().info("Stopped")
     node.destroy_node()
     rclpy.shutdown()
