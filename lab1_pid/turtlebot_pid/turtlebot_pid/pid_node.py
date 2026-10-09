@@ -79,7 +79,9 @@ class PIDController(Node):
         self.publisher_.publish(Twist())
 
     def control_loop(self):
-        if not self.state_received: return
+        if not self.state_received:
+            self.last_time = time.time()  # do not count the wait for the first pose in dt
+            return
 
         dt = time.time() - self.last_time
         if dt <= 0: dt = 0.001

@@ -29,55 +29,76 @@ Both versions use the same control law, at 10 Hz:
 
 ## Simulation
 
-### Build
+### 1. Set up every terminal
 
-Ubuntu 22.04 with ROS 2 Humble in `/opt/ros`:
+Run this line first in **every** new terminal (all terminals must use the same line):
+
+Ubuntu 22.04, ROS 2 Humble in `/opt/ros`:
 
 ```bash
-cd ~/ros2_ws
-source /opt/ros/humble/setup.bash
-colcon build --packages-select turtlebot_pid
-source install/setup.bash
+source /opt/ros/humble/setup.bash && source ~/ros2_ws/install/setup.bash && export ROS_LOCALHOST_ONLY=1
 ```
 
-macOS with ROS 2 Humble from RoboStack (pixi environment in `~/ros2_ws`, zsh):
+macOS, ROS 2 Humble from RoboStack (pixi environment in `~/ros2_ws`, zsh):
 
 ```zsh
-cd ~/ros2_ws
-pixi shell
-colcon build --packages-select turtlebot_pid
-source install/setup.zsh
+eval "$(pixi shell-hook --manifest-path ~/ros2_ws/pixi.toml 2>/dev/null)" && source ~/ros2_ws/install/setup.zsh && export ROS_LOCALHOST_ONLY=1
 ```
 
-### Run
+`ROS_LOCALHOST_ONLY=1` keeps other ROS 2 computers on the same network (e.g. lab Wi-Fi) from
+interfering with `/cmd_vel` and `/odom`.
 
-Every terminal must be set up first: on Ubuntu `source /opt/ros/humble/setup.bash` and
-`source ~/ros2_ws/install/setup.bash`; on macOS `cd ~/ros2_ws`, `pixi shell`, then
-`source install/setup.zsh`.
+### 2. Build (once, and after every change to the code)
 
 ```bash
-# terminal 1
+cd ~/ros2_ws && colcon build --packages-select turtlebot_pid
+```
+
+Then run the setup line again (it sources the new build).
+
+### 3. Run: three terminals, in this order
+
+**Terminal 1, Gazebo:**
+
+```bash
 export TURTLEBOT3_MODEL=burger
 ros2 launch turtlebot3_gazebo empty_world.launch.py
-
-# terminal 2
-python3 ~/ros2_ws/src/cp241_alnc_iisc/lab1_pid/turtlebot_pid/turtlebot_pid/plot_trajectory.py
-
-# terminal 3
-ros2 run turtlebot_pid pid_node
 ```
 
-After `GOAL REACHED!`, press Ctrl+C in terminal 2. The plot is saved to `~/trajectory.png`.
-Pressing Ctrl+C in terminal 3 at any time stops the robot.
+Wait for `Successfully spawned entity [burger]`. If it has not appeared after about a minute,
+press Ctrl+C and run the launch command again.
 
-To use another goal, pass it to both scripts:
+**Terminal 2, trajectory recorder** (give it the same goal as terminal 3):
 
 ```bash
-python3 ~/ros2_ws/src/cp241_alnc_iisc/lab1_pid/turtlebot_pid/turtlebot_pid/plot_trajectory.py --ros-args -p xd:=-2.0 -p yd:=1.0
-ros2 run turtlebot_pid pid_node --ros-args -p xd:=-2.0 -p yd:=1.0
+python3 ~/ros2_ws/src/cp241_alnc_iisc/lab1_pid/turtlebot_pid/turtlebot_pid/plot_trajectory.py --ros-args -p xd:=5.02 -p yd:=1.78
 ```
 
-To test from a different start pose, restart Gazebo and move the robot first:
+Wait for `Recording /odom ...`.
+
+**Terminal 3, controller:**
+
+```bash
+ros2 run turtlebot_pid pid_node --ros-args -p xd:=5.02 -p yd:=1.78
+```
+
+When terminal 3 prints `GOAL REACHED!`:
+
+1. Press Ctrl+C **once** in terminal 2 and wait for `Trajectory plot saved to .../trajectory.png`.
+2. Press Ctrl+C in terminal 3. (Ctrl+C here at any time stops the robot.)
+3. Open the plot: `open ~/trajectory.png` (macOS) or `xdg-open ~/trajectory.png` (Ubuntu).
+
+For another goal, change `xd` and `yd` in **both** the terminal 2 and terminal 3 commands.
+
+### 4. Next run, or start from another pose
+
+Gazebo can stay open. In terminal 3, put the robot back at the origin:
+
+```bash
+ros2 service call /reset_world std_srvs/srv/Empty
+```
+
+For an arbitrary start pose, then drive the robot along an arc for 6 s and stop it:
 
 ```bash
 timeout 6 ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.15}, angular: {z: 0.5}}"
@@ -89,6 +110,21 @@ macOS has no `timeout`; use this for the first line instead:
 ```zsh
 ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.15}, angular: {z: 0.5}}" & sleep 6; kill $!
 ```
+
+Then start terminal 2 and terminal 3 again (step 3).
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `command not found: ros2` / `colcon`, or `Package 'turtlebot_pid' not found` | Run the setup line (step 1) in that terminal; build once (step 2). |
+| The robot never appears in Gazebo, or `Service /spawn_entity unavailable` | Ctrl+C in terminal 1 and run the launch command again. |
+| Gazebo does not start, or behaves oddly after an earlier run | Ctrl+C everything, then `pkill -f gzserver; pkill -f gzclient` and start again. |
+| `ros2 topic list` does not show `/odom` and `/cmd_vel` | That terminal was set up differently: use the same setup line everywhere. |
+| The goal star in the plot is in the wrong place | Terminals 2 and 3 must get the same `xd`, `yd`. |
+| No plot saved | Press Ctrl+C only once in terminal 2 and wait for the "saved" line. |
+| The robot keeps moving after everything was closed | `ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{}"` |
+| Changes to `pid_node.py` have no effect | Build again (step 2), then the setup line. |
 
 ### Parameters of `pid_node`
 
@@ -111,11 +147,44 @@ Poses containing NaN or inf are ignored and count as no pose.
 
 `turtlebot_pid/pid_ros_plot.m` is the course's MATLAB template with the controller above. It reads
 the PhaseSpace pose from `/phasespace/pose` (`geometry_msgs/Pose2D`) and sends commands to
-`/HWTB3_10/cmd_vel` on `ROS_DOMAIN_ID` 30.
+`/HWTB3_10/cmd_vel` on `ROS_DOMAIN_ID` 30. Needs MATLAB with the ROS Toolbox.
 
-1. Open `pid_ros_plot.m` and set the goal under "Target Pose" (`xd`, `yd` in metres, inside the MOCAP area).
-2. Press Run. The live plot shows the robot; at the goal it stops and saves `robot_trajectory.csv`.
-3. Ctrl+C stops the script but not the robot: then run `stop.m`, which keeps sending zero velocity.
+### Before the first run
+
+1. **Robot number.** The files use robot `HWTB3_10`. For another robot, change `/HWTB3_10/cmd_vel`
+   in both `pid_ros_plot.m` and `stop.m`.
+2. **Check the MOCAP pose** in the MATLAB Command Window:
+
+   ```matlab
+   setenv("ROS_DOMAIN_ID","30");
+   node = ros2node("/pose_check");
+   sub = ros2subscriber(node, "/phasespace/pose", "geometry_msgs/Pose2D");
+   pause(2); sub.LatestMessage
+   ```
+
+   - `x`, `y` must be in metres (small numbers inside the arena), not millimetres.
+   - Turn the robot by hand about 90 degrees to the left and run `sub.LatestMessage` again:
+     `theta` must increase by about 1.57 (radians). Pushed forward, `x`, `y` must change in the
+     direction the robot faces. If not, ask the TAs before running the controller.
+   - Then `clear node sub`.
+3. **Goal.** Pick a goal inside the MOCAP area; for the first run, about 0.5 m from the robot.
+4. Open `stop.m` in a second tab, ready for an emergency.
+
+### Run
+
+1. Open `pid_ros_plot.m` and set the goal under "Target Pose" (`xd`, `yd` in metres).
+2. Press Run. The console prints the position, error, `v` and `w` at 10 Hz and the live plot
+   shows the robot.
+3. At the goal it prints `GOAL REACHED!`, stops the robot and saves `robot_trajectory.csv` in the
+   current MATLAB folder.
+
+If `No valid MOCAP pose, stopping` appears, the markers are not visible; the robot waits and
+continues by itself once they are tracked again.
+
+### Emergency stop
+
+Ctrl+C stops the script but not the robot. Then run `stop.m`: it keeps sending zero velocity until
+you press Ctrl+C in it.
 
 ## Results
 

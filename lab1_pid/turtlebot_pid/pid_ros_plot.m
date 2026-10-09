@@ -134,6 +134,7 @@ drawnow;
 % MAIN CONTROL LOOP
 % ============================================================
 disp("Starting controller! (Ctrl+C stops this script; then run stop.m to stop the robot)")
+timer = tic;            % setting up the figure must not count in the first dt
 while true
 
     % --------------------------------------------------------
@@ -143,6 +144,7 @@ while true
     last_pose_time = getappdata(groot, 'pid_last_pose_time');
 
     if isempty(poseMsg) || isempty(last_pose_time)
+        timer = tic;        % do not count the wait for the first pose in dt
         waitfor(rate);
         continue;
     end
@@ -196,6 +198,8 @@ while true
     if isempty(start_x)
         start_x = xc1;
         start_y = yc1;
+        t_start = tic;
+        trajectory_t(end) = 0;
 
         set(startPlot, ...
             'XData', start_x, ...
