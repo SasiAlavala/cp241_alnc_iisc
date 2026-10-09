@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'pid_node = turtlebot_pid.pid_node:main',
+            'pid_node_mocap = turtlebot_pid.pid_node_mocap:main',
         ],
     },
 )

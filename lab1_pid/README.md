@@ -1,13 +1,14 @@
 # Lab 1: PID control of TurtleBot3
 
 Go-to-goal PID controller for a TurtleBot3 Burger, in simulation (ROS 2 Humble, Gazebo) and on
-the physical robot (MATLAB, PhaseSpace motion capture).
+the physical robot (PhaseSpace motion capture, in MATLAB or Python).
 
 | File | Purpose |
 |---|---|
 | `turtlebot_pid/turtlebot_pid/pid_node.py` | controller node for simulation |
 | `turtlebot_pid/turtlebot_pid/plot_trajectory.py` | records `/odom` and plots the trajectory |
-| `turtlebot_pid/pid_ros_plot.m` | the same controller for the physical robot with MOCAP |
+| `turtlebot_pid/turtlebot_pid/pid_node_mocap.py` | the same controller for the physical robot, from PhaseSpace markers |
+| `turtlebot_pid/pid_ros_plot.m` | the same controller for the physical robot with MOCAP, in MATLAB |
 | `turtlebot_pid/stop.m` | keeps sending zero velocity to the physical robot |
 | `results/` | trajectory plots from simulation |
 
@@ -154,9 +155,14 @@ the PhaseSpace pose from `/phasespace/pose` (`geometry_msgs/Pose2D`) and sends c
 
 ### Before the first run
 
-1. **Robot number.** The files use robot `HWTB3_10`. For another robot, change `/HWTB3_10/cmd_vel`
+1. **macOS only: network permission.** System Settings, Privacy & Security, Local Network: turn
+   on MATLAB, then quit and reopen MATLAB. Without it MATLAB cannot see the MOCAP or the robot
+   (`ros2 topic list` shows only `/parameter_events` and `/rosout`). If it still sees nothing,
+   quit MATLAB and start it from a terminal that has the permission (e.g. VS Code's):
+   `/Applications/MATLAB_R2026a.app/bin/matlab &`.
+2. **Robot number.** The files use robot `HWTB3_10`. For another robot, change `/HWTB3_10/cmd_vel`
    in both `pid_ros_plot.m` and `stop.m`.
-2. **Check the MOCAP pose** in the MATLAB Command Window:
+3. **Check the MOCAP pose** in the MATLAB Command Window:
 
    ```matlab
    setenv("ROS_DOMAIN_ID","30");
@@ -170,8 +176,8 @@ the PhaseSpace pose from `/phasespace/pose` (`geometry_msgs/Pose2D`) and sends c
      `theta` must increase by about 1.57 (radians). Pushed forward, `x`, `y` must change in the
      direction the robot faces. If not, ask the TAs before running the controller.
    - Then `clear node sub`.
-3. **Goal.** Pick a goal inside the MOCAP area; for the first run, about 0.5 m from the robot.
-4. Open `stop.m` in a second tab, ready for an emergency.
+4. **Goal.** Pick a goal inside the MOCAP area; for the first run, about 0.5 m from the robot.
+5. Open `stop.m` in a second tab, ready for an emergency.
 
 ### Run
 
@@ -188,6 +194,49 @@ continues by itself once they are tracked again.
 
 Ctrl+C stops the script but not the robot. Then run `stop.m`: it keeps sending zero velocity until
 you press Ctrl+C in it.
+
+## Physical robot (Python, PhaseSpace markers)
+
+`pid_node_mocap` runs the same controller on the lab's ROS 2 setup. It reads the PhaseSpace
+markers from `/phasespace/markers` (`phasespace_msgs/Markers`): the robot's position is the
+midpoint of its two markers and its heading is the direction from the back to the front marker.
+It publishes to `/r1a005/cmd_vel` by default.
+
+`phasespace_msgs` comes with the lab's PhaseSpace driver. If the node prints
+`phasespace_msgs not found` (or Python reports `No module named 'phasespace_msgs'`), that
+workspace has not been sourced in this terminal.
+
+The file runs on its own, like the lab's demo code (it does not need this package to be built):
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/<phasespace_ws>/install/setup.bash      # the workspace with phasespace_msgs
+python3 pid_node_mocap.py                        # asks: Enter your value X: / Enter your value Y:
+```
+
+The goal can also be given directly, which skips the questions:
+`python3 pid_node_mocap.py --ros-args -p xd:=1.0 -p yd:=0.5`. After `colcon build` the same node
+is available as `ros2 run turtlebot_pid pid_node_mocap`.
+
+Do not set `ROS_LOCALHOST_ONLY` here (the robot and MOCAP are on the network); set
+`ROS_DOMAIN_ID` if the lab uses one. The first line it prints after the markers are seen is
+`First MOCAP pose: (x, y), heading ...`: check that it matches where the robot is, in metres.
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `xd`, `yd` | asked at start | goal [m], inside the MOCAP area |
+| `tolerance` | 0.05 | stop this close to the goal [m] |
+| `v_max`, `w_max` | 0.3, 1.0 | speed limits [m/s, rad/s], as in the lab demo; use `0.2` for both to match the assignment's limits |
+| `cmd_vel_topic` | `/r1a005/cmd_vel` | the robot's velocity topic |
+| `markers_topic` | `/phasespace/markers` | PhaseSpace markers topic |
+| `front_marker_id`, `back_marker_id` | -1, -1 | the robot's marker IDs; -1 uses the first two markers in the message, which is only correct if no other markers are visible |
+| `position_scale` | 1.0 | 0.001 if the markers are in millimetres |
+| `heading_offset` | 0.0 | added to the measured heading [rad] |
+| `pose_timeout` | 0.5 | stop the robot if no valid pose arrives for this long [s] |
+| `max_accel` | 0.5 | limit on how fast v changes [m/s^2]; 0 = no limit |
+
+Markers that the cameras cannot see (negative `cond`) or that are missing count as no pose: the
+robot stops and continues when they are tracked again. Ctrl+C stops the robot.
 
 ## Results
 
