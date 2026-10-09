@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""
-PID go-to-goal controller for the physical TurtleBot3 with PhaseSpace motion capture.
-Same controller as pid_node.py. The pose comes from two PhaseSpace markers on the robot,
-as in the lab's demo code: position = midpoint, heading = direction from back to front marker.
-
-Source the workspace that contains phasespace_msgs first, then:
-    ros2 run turtlebot_pid pid_node_mocap                  (asks for the goal X and Y)
-    ros2 run turtlebot_pid pid_node_mocap --ros-args -p xd:=1.0 -p yd:=0.5
-"""
 import rclpy
 from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
