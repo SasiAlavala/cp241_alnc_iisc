@@ -61,9 +61,12 @@ Then run the setup line again (it sources the new build).
 **Terminal 1, Gazebo:**
 
 ```bash
-export TURTLEBOT3_MODEL=burger
+export TURTLEBOT3_MODEL=burger GAZEBO_IP=127.0.0.1 IGN_IP=127.0.0.1
 ros2 launch turtlebot3_gazebo empty_world.launch.py
 ```
+
+`GAZEBO_IP` and `IGN_IP` keep Gazebo's own messaging on this computer; on networks that block
+multicast (some campus Wi-Fi) the robot otherwise never spawns.
 
 Wait for `Successfully spawned entity [burger]`. If it has not appeared after about a minute,
 press Ctrl+C and run the launch command again.
@@ -118,7 +121,7 @@ Then start terminal 2 and terminal 3 again (step 3).
 | Problem | Fix |
 |---|---|
 | `command not found: ros2` / `colcon`, or `Package 'turtlebot_pid' not found` | Run the setup line (step 1) in that terminal; build once (step 2). |
-| The robot never appears in Gazebo, or `Service /spawn_entity unavailable` | Ctrl+C in terminal 1 and run the launch command again. |
+| The robot never appears in Gazebo, or `Service /spawn_entity unavailable` | Ctrl+C in terminal 1 and run the launch command again. If the log shows `Exception sending a multicast message`, the `GAZEBO_IP`/`IGN_IP` line was not set in terminal 1. |
 | Gazebo does not start, or behaves oddly after an earlier run | Ctrl+C everything, then `pkill -f gzserver; pkill -f gzclient` and start again. |
 | `ros2 topic list` does not show `/odom` and `/cmd_vel` | That terminal was set up differently: use the same setup line everywhere. |
 | The goal star in the plot is in the wrong place | Terminals 2 and 3 must get the same `xd`, `yd`. |
